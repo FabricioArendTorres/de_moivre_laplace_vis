@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Approximating the Binomial Distribution with a Gaussian</title>
+    <meta name="description"
+        content="Interactive visualization of the De Moivre-Laplace theorem showing how a Binomial distribution can be approximated by a Gaussian (Normal) distribution." />
+
+    <!-- Pico.css -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+
+    <!-- KaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+        onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'\\(',right:'\\)',display:false}]});"></script>
+
+    <!-- Plotly.js -->
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+    <style>
+        :root {
+            --pico-font-size: 16px;
+        }
+
+        body {
+            padding-bottom: 3rem;
+        }
+
+        header.hero {
+            text-align: center;
+            padding: 2rem 1rem 1rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            border-radius: 0 0 1rem 1rem;
+        }
+
+        header.hero h1 {
+            color: #fff;
+            margin-bottom: 0.25rem;
+            font-size: 1.75rem;
+        }
+
+        header.hero p {
+            opacity: 0.9;
+            margin-bottom: 0;
+            font-size: 1rem;
+        }
+
+        .control-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .control-panel {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .slider-group label {
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 0.25rem;
+        }
+
+        .slider-group label .slider-value {
+            font-family: 'Courier New', monospace;
+            font-size: 1.1rem;
+            color: var(--pico-primary);
+            font-weight: 700;
+        }
+
+        #chart-container {
+            width: 100%;
+            min-height: 420px;
+        }
+
+        .formula-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .formula-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .formula-card {
+            border: 1px solid var(--pico-muted-border-color);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            background: var(--pico-card-background-color);
+        }
+
+        .formula-card h4 {
+            margin-top: 0;
+            margin-bottom: 0.5rem;
+            color: var(--pico-primary);
+        }
+
+        .bridge-values {
+            display: flex;
+            justify-content: center;
+            gap: 3rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+
+        .bridge-values .val-box {
+            text-align: center;
+        }
+
+        .bridge-values .val-box .val-label {
+            font-size: 0.85rem;
+            color: var(--pico-muted-color);
+        }
+
+        .bridge-values .val-box .val-number {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--pico-primary);
+            font-family: 'Courier New', monospace;
+        }
+
+        .validity-badge {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            border-radius: 2rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        .validity-badge.valid {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .validity-badge.invalid {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .check-row {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 0.75rem;
+        }
+
+        .check-item {
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+        }
+
+        .check-item.pass {
+            color: #155724;
+        }
+
+        .check-item.fail {
+            color: #721c24;
+        }
+
+        .cc-example {
+            background: var(--pico-card-background-color);
+            border-left: 4px solid var(--pico-primary);
+            padding: 1rem 1.25rem;
+            border-radius: 0 0.5rem 0.5rem 0;
+            margin-top: 1rem;
+        }
+
+        section {
+            margin-bottom: 1.5rem;
+        }
+
+        .katex-display {
+            margin: 0.5em 0 !important;
+        }
+
+        /* KaTeX can overflow on narrow screens — let it scroll */
+        .formula-card {
+            overflow-x: auto;
+        }
+
+        /* ---- Mobile tweaks ---- */
+        @media (max-width: 480px) {
+            header.hero h1 {
+                font-size: 1.25rem;
+            }
+
+            header.hero p {
+                font-size: 0.88rem;
+            }
+
+            #chart-container {
+                min-height: 280px;
+            }
+
+            .bridge-values {
+                gap: 1.5rem;
+            }
+
+            .check-row {
+                gap: 0.75rem;
+            }
+        }
+
+        /* --- Integral Calculator --- */
+        .int-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        @media (max-width: 600px) {
+            .int-inputs {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .int-inputs label {
+            font-weight: 600;
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+
+        .int-results {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 1rem;
+            text-align: center;
+            margin-top: 1rem;
+        }
+
+        @media (max-width: 720px) {
+            .int-results {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .int-results {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .int-result-box {
+            border: 1px solid var(--pico-muted-border-color);
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            background: var(--pico-card-background-color);
+        }
+
+        .int-result-box .res-label {
+            font-size: 0.8rem;
+            color: var(--pico-muted-color);
+            margin-bottom: 0.25rem;
+        }
+
+        .int-result-box .res-value {
+            font-family: 'Courier New', monospace;
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .int-result-box.binomial .res-value {
+            color: #667eea;
+        }
+
+        .int-result-box.gaussian .res-value {
+            color: #e74c3c;
+        }
+
+        .int-result-box.diff .res-value {
+            color: #e67e22;
+        }
+
+        .int-note {
+            font-size: 0.82rem;
+            color: var(--pico-muted-color);
+            margin-top: 0.5rem;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header class="hero">
+        <h1>Approximating the Binomial Distribution with a Gaussian</h1>
+        <p>An interactive exploration of the De Moivre–Laplace theorem</p>
+    </header>
+
+    <main class="container">
+
+        <!-- Control Panel -->
+        <section>
+            <article>
+                <header><strong>Parameters</strong></header>
+                <div class="control-panel">
+                    <div class="slider-group">
+                        <label>
+                            Number of Trials \(N\)
+                            <span class="slider-value" id="n-display">50</span>
+                        </label>
+                        <input type="range" id="slider-n" min="1" max="200" value="50" step="1" />
+                    </div>
+                    <div class="slider-group">
+                        <label>
+                            Probability of Success \(p\)
+                            <span class="slider-value" id="p-display">0.50</span>
+                        </label>
+                        <input type="range" id="slider-p" min="0.01" max="0.99" value="0.50" step="0.01" />
+                    </div>
+                </div>
+            </article>
+        </section>
+
+        <!-- Chart -->
+        <section>
+            <article>
+                <div id="chart-container"></div>
+            </article>
+        </section>
+
+        <!-- Mathematical Bridge -->
+        <section>
+            <h2>The Mathematical Bridge</h2>
+
+            <div class="formula-grid">
+                <div class="formula-card">
+                    <h4>Binomial PMF</h4>
+                    <p>$$P(X = k) = \binom{N}{k}\, p^{k}\,(1-p)^{N-k}$$</p>
+                </div>
+                <div class="formula-card">
+                    <h4>Gaussian PDF</h4>
+                    <p>$$f(x) = \frac{1}{\sigma\sqrt{2\pi}}\, e^{-\frac{1}{2}\!\left(\frac{x - \mu}{\sigma}\right)^2}$$
+                    </p>
+                </div>
+            </div>
+
+            <div style="text-align:center; margin-top:1.5rem;">
+                <p>The bridge between these two distributions is given by their shared moments:</p>
+                <p>$$\mu = Np \qquad \sigma = \sqrt{Np(1-p)}$$</p>
+            </div>
+
+            <div class="bridge-values">
+                <div class="val-box">
+                    <div class="val-label">Mean (\(\mu\))</div>
+                    <div class="val-number" id="mu-display">25.00</div>
+                </div>
+                <div class="val-box">
+                    <div class="val-label">Std Dev (\(\sigma\))</div>
+                    <div class="val-number" id="sigma-display">3.54</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Rule of Thumb -->
+        <section>
+            <h2>Rule of Thumb</h2>
+            <p>
+                The Normal approximation to the Binomial is generally considered reliable when <strong>both</strong>
+                \(Np \geq 5\) <strong>and</strong> \(N(1-p) \geq 5\). This ensures the distribution is
+                sufficiently symmetric and bell-shaped.
+            </p>
+
+            <div class="check-row">
+                <span class="check-item" id="check-np">Np = 25.00 ✓</span>
+                <span class="check-item" id="check-nq">N(1−p) = 25.00 ✓</span>
+                <span class="validity-badge valid" id="validity-badge">Approximation Valid ✓</span>
+            </div>
+        </section>
+
+        <!-- Continuity Correction -->
+        <section>
+            <h2>Continuity Correction</h2>
+            <p>
+                Because the Binomial is a <strong>discrete</strong> distribution while the Gaussian is
+                <strong>continuous</strong>, estimating the probability of an exact integer outcome \(k\)
+                requires integrating the Normal PDF over the interval
+                \([k - 0.5,\; k + 0.5]\). This adjustment is called the <em>continuity correction</em>.
+            </p>
+
+            <div class="cc-example" id="cc-example">
+                To find \(P(X = 25)\), evaluate the Gaussian area from <strong>24.5</strong> to <strong>25.5</strong>.
+            </div>
+        </section>
+
+        <!-- Integral / Probability Calculator -->
+        <section>
+            <h2>Probability Calculator</h2>
+            <p>
+                Choose a range \([a,\, b]\) to compare the exact Binomial range probability against
+                the Gaussian integral. The selected region is shaded on the chart above.
+            </p>
+
+            <article>
+                <div class="int-inputs">
+                    <div>
+                        <label for="input-a">Lower bound <em>a</em></label>
+                        <input type="number" id="input-a" value="22" step="0.5" />
+                    </div>
+                    <div>
+                        <label for="input-b">Upper bound <em>b</em></label>
+                        <input type="number" id="input-b" value="28" step="0.5" />
+                    </div>
+                </div>
+
+                <div class="int-results">
+                    <div class="int-result-box binomial">
+                        <div class="res-label">Binomial (exact)</div>
+                        <div class="res-value" id="res-binom">—</div>
+                        <div class="int-note" id="res-binom-range">\(\sum_{k=⌈a⌉}^{⌊b⌋} P(X=k)\)</div>
+                    </div>
+                    <div class="int-result-box gaussian">
+                        <div class="res-label">Gaussian (integral)</div>
+                        <div class="res-value" id="res-gauss">—</div>
+                        <div class="int-note">\(\Phi(b) - \Phi(a)\)</div>
+                    </div>
+                    <div class="int-result-box diff">
+                        <div class="res-label">Absolute difference</div>
+                        <div class="res-value" id="res-diff">—</div>
+                        <div class="int-note">|Binomial − Gaussian|</div>
+                    </div>
+                </div>
+            </article>
+        </section>
+
+    </main>
+
+    <script>
+        /* ============================================================
+           Math helpers
+           ============================================================ */
+
+        // Log-gamma via Lanczos approximation (handles large N without overflow)
+        function logGamma(z) {
+            if (z < 0.5) {
+                return Math.log(Math.PI / Math.sin(Math.PI * z)) - logGamma(1 - z);
+            }
+            z -= 1;
+            const g = 7;
+            const c = [
+                0.99999999999980993,
+                676.5203681218851,
+                -1259.1392167224028,
+                771.32342877765313,
+                -176.61502916214059,
+                12.507343278686905,
+                -0.13857109526572012,
+                9.9843695780195716e-6,
+                1.5056327351493116e-7
+            ];
+            let x = c[0];
+            for (let i = 1; i < g + 2; i++) {
+                x += c[i] / (z + i);
+            }
+            const t = z + g + 0.5;
+            return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
+        }
+
+        // Log of binomial coefficient C(n, k)
+        function logComb(n, k) {
+            if (k < 0 || k > n) return -Infinity;
+            return logGamma(n + 1) - logGamma(k + 1) - logGamma(n - k + 1);
+        }
+
+        // Binomial PMF using log space to avoid overflow
+        function binomialPMF(k, n, p) {
+            if (p === 0) return k === 0 ? 1 : 0;
+            if (p === 1) return k === n ? 1 : 0;
+            const logP = logComb(n, k) + k * Math.log(p) + (n - k) * Math.log(1 - p);
+            return Math.exp(logP);
+        }
+
+        // Gaussian PDF
+        function gaussianPDF(x, mu, sigma) {
+            if (sigma === 0) return 0;
+            const z = (x - mu) / sigma;
+            return (1 / (sigma * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * z * z);
+        }
+
+        // Error function (Abramowitz & Stegun 7.1.26 — max error 1.5e-7)
+        function erf(x) {
+            const sign = x < 0 ? -1 : 1;
+            x = Math.abs(x);
+            const t = 1 / (1 + 0.3275911 * x);
+            const poly = t * (0.254829592
+                + t * (-0.284496736
+                    + t * (1.421413741
+                        + t * (-1.453152027
+                            + t * 1.061405429))));
+            return sign * (1 - poly * Math.exp(-x * x));
+        }
+
+        // Gaussian CDF  Φ(x)
+        function gaussianCDF(x, mu, sigma) {
+            if (sigma === 0) return x >= mu ? 1 : 0;
+            return 0.5 * (1 + erf((x - mu) / (sigma * Math.SQRT2)));
+        }
+
+        // Gaussian probability over [a, b]
+        function gaussianRangeProb(a, b, mu, sigma) {
+            return gaussianCDF(b, mu, sigma) - gaussianCDF(a, mu, sigma);
+        }
+
+        // Exact Binomial  P(ceil(a) <= X <= floor(b))
+        function binomialRangeProb(a, b, n, p) {
+            const kLow = Math.ceil(a);
+            const kHigh = Math.floor(b);
+            if (kLow > kHigh) return 0;
+            let sum = 0;
+            for (let k = Math.max(0, kLow); k <= Math.min(n, kHigh); k++) {
+                sum += binomialPMF(k, n, p);
+            }
+            return sum;
+        }
+
+        /* ============================================================
+           DOM references
+           ============================================================ */
+
+        const sliderN = document.getElementById('slider-n');
+        const sliderP = document.getElementById('slider-p');
+        const nDisplay = document.getElementById('n-display');
+        const pDisplay = document.getElementById('p-display');
+        const muDisplay = document.getElementById('mu-display');
+        const sigmaDisplay = document.getElementById('sigma-display');
+        const checkNp = document.getElementById('check-np');
+        const checkNq = document.getElementById('check-nq');
+        const validityBadge = document.getElementById('validity-badge');
+        const ccExample = document.getElementById('cc-example');
+        const chartContainer = document.getElementById('chart-container');
+        const inputA = document.getElementById('input-a');
+        const inputB = document.getElementById('input-b');
+        const resBinom = document.getElementById('res-binom');
+        const resGauss = document.getElementById('res-gauss');
+        const resDiff = document.getElementById('res-diff');
+        const resBinomRange = document.getElementById('res-binom-range');
+
+        /* ============================================================
+           Chart initialisation
+           ============================================================ */
+
+        const binomialTrace = {
+            x: [],
+            y: [],
+            type: 'bar',
+            name: 'Binomial PMF',
+            marker: {
+                color: 'rgba(102, 126, 234, 0.6)',
+                line: { color: 'rgba(102, 126, 234, 1)', width: 1 }
+            },
+            hovertemplate: 'k = %{x}<br>P(X=k) = %{y:.6f}<extra>Binomial</extra>'
+        };
+
+        const gaussianTrace = {
+            x: [],
+            y: [],
+            type: 'scatter',
+            mode: 'lines',
+            name: 'Gaussian PDF',
+            line: { color: '#e74c3c', width: 2.5 },
+            hovertemplate: 'x = %{x:.2f}<br>f(x) = %{y:.6f}<extra>Gaussian</extra>'
+        };
+
+        const layout = {
+            margin: { t: 40, r: 30, b: 50, l: 60 },
+            xaxis: {
+                title: { text: 'Number of Successes (k)' },
+                dtick: undefined,
+                range: undefined,
+                fixedrange: true
+            },
+            yaxis: {
+                title: { text: 'Probability' },
+                rangemode: 'tozero',
+                fixedrange: true
+            },
+            legend: {
+                x: 1,
+                y: 1,
+                xanchor: 'right',
+                bgcolor: 'rgba(255,255,255,0.8)',
+                bordercolor: '#ccc',
+                borderwidth: 1
+            },
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            font: { family: 'system-ui, sans-serif' },
+            bargap: 0.05
+        };
+
+        const config = {
+            responsive: true,
+            displayModeBar: false,
+            scrollZoom: false
+        };
+
+        // Shading traces — filled regions within [a, b]
+        const binomShadeTrace = {
+            x: [], y: [],
+            type: 'bar',
+            name: 'Binomial (selected)',
+            marker: { color: 'rgba(102, 126, 234, 1)', line: { color: 'rgba(60,80,200,1)', width: 1 } },
+            showlegend: true,
+            hovertemplate: 'k = %{x}<br>P(X=k) = %{y:.6f}<extra>Selected (Binomial)</extra>'
+        };
+
+        const gaussShadeTrace = {
+            x: [], y: [],
+            type: 'scatter',
+            mode: 'none',
+            name: 'Gaussian (selected)',
+            fill: 'tozeroy',
+            fillcolor: 'rgba(231, 76, 60, 0.25)',
+            showlegend: true,
+            hoverinfo: 'skip'
+        };
+
+        Plotly.newPlot(chartContainer, [binomialTrace, gaussianTrace, binomShadeTrace, gaussShadeTrace], layout, config);
+
+        /* ============================================================
+           Update logic
+           ============================================================ */
+
+        function update() {
+            const N = parseInt(sliderN.value, 10);
+            const p = parseFloat(sliderP.value);
+            const q = 1 - p;
+            const mu = N * p;
+            const sigma = Math.sqrt(N * p * q);
+
+            // Slider value displays
+            nDisplay.textContent = N;
+            pDisplay.textContent = p.toFixed(2);
+
+            // Bridge values
+            muDisplay.textContent = mu.toFixed(2);
+            sigmaDisplay.textContent = sigma.toFixed(2);
+
+            // --- Binomial data ---
+            const kValues = [];
+            const binomialY = [];
+            for (let k = 0; k <= N; k++) {
+                kValues.push(k);
+                binomialY.push(binomialPMF(k, N, p));
+            }
+
+            // --- Gaussian data (smooth curve) ---
+            const gxMin = mu - 4 * sigma;
+            const gxMax = mu + 4 * sigma;
+            const numPoints = 300;
+            const step = (gxMax - gxMin) / (numPoints - 1);
+            const gaussX = [];
+            const gaussY = [];
+            for (let i = 0; i < numPoints; i++) {
+                const x = gxMin + i * step;
+                gaussX.push(x);
+                gaussY.push(gaussianPDF(x, mu, sigma));
+            }
+
+            // --- Update chart (base traces) ---
+            const currentLayout = {
+                ...layout,
+                xaxis: { ...layout.xaxis, range: [mu - 5 * sigma, mu + 5 * sigma] }
+            };
+
+            // Build shade data using current a/b
+            const { shadeX_binom, shadeY_binom, shadeX_gauss, shadeY_gauss } =
+                buildShadeTraces(mu, sigma, N, p, gaussX);
+
+            Plotly.react(chartContainer, [
+                { ...binomialTrace, x: kValues, y: binomialY },
+                { ...gaussianTrace, x: gaussX, y: gaussY },
+                { ...binomShadeTrace, x: shadeX_binom, y: shadeY_binom },
+                { ...gaussShadeTrace, x: shadeX_gauss, y: shadeY_gauss }
+            ], currentLayout, config);
+
+            // --- Rule of Thumb ---
+            const np = N * p;
+            const nq = N * q;
+            const npOk = np >= 5;
+            const nqOk = nq >= 5;
+
+            checkNp.textContent = `Np = ${np.toFixed(2)} ${npOk ? '✓' : '✗'}`;
+            checkNp.className = `check-item ${npOk ? 'pass' : 'fail'}`;
+
+            checkNq.textContent = `N(1−p) = ${nq.toFixed(2)} ${nqOk ? '✓' : '✗'}`;
+            checkNq.className = `check-item ${nqOk ? 'pass' : 'fail'}`;
+
+            if (npOk && nqOk) {
+                validityBadge.textContent = 'Approximation Valid ✓';
+                validityBadge.className = 'validity-badge valid';
+            } else {
+                validityBadge.textContent = 'Approximation Poor ✗';
+                validityBadge.className = 'validity-badge invalid';
+            }
+
+            // --- Continuity Correction ---
+            const kExample = Math.round(mu);
+            ccExample.innerHTML =
+                `To find <em>P(X = ${kExample})</em>, evaluate the Gaussian area from ` +
+                `<strong>${(kExample - 0.5).toFixed(1)}</strong> to ` +
+                `<strong>${(kExample + 0.5).toFixed(1)}</strong>.`;
+
+            // --- Integral calculator results ---
+            updateIntegral(mu, sigma, N, p, gaussX);
+
+            // Capture state for the a/b input listeners
+            _state = { mu, sigma, N, p, gaussX };
+        }
+
+        /* ============================================================
+           Shade-trace builder  (shared by update & integral handler)
+           ============================================================ */
+        function buildShadeTraces(mu, sigma, N, p, gaussX) {
+            const a = parseFloat(inputA.value);
+            const b = parseFloat(inputB.value);
+
+            // Binomial: highlight bars in [ceil(a), floor(b)]
+            const kLow = Math.ceil(a);
+            const kHigh = Math.floor(b);
+            const shadeX_binom = [];
+            const shadeY_binom = [];
+            for (let k = Math.max(0, kLow); k <= Math.min(N, kHigh); k++) {
+                shadeX_binom.push(k);
+                shadeY_binom.push(binomialPMF(k, N, p));
+            }
+
+            // Gaussian: slice the precomputed gaussX array to the [a, b] window
+            const shadeX_gauss = [];
+            const shadeY_gauss = [];
+            // Ensure we include exactly a and b as endpoints
+            const allX = [a, ...gaussX.filter(x => x > a && x < b), b];
+            allX.sort((x, y) => x - y);
+            for (const x of allX) {
+                shadeX_gauss.push(x);
+                shadeY_gauss.push(gaussianPDF(x, mu, sigma));
+            }
+
+            return { shadeX_binom, shadeY_binom, shadeX_gauss, shadeY_gauss };
+        }
+
+        /* ============================================================
+           Integral result panel updater
+           ============================================================ */
+        function updateIntegral(mu, sigma, N, p, gaussX) {
+            const a = parseFloat(inputA.value);
+            const b = parseFloat(inputB.value);
+            if (isNaN(a) || isNaN(b) || a >= b) {
+                resBinom.textContent = 'invalid range';
+                resGauss.textContent = 'invalid range';
+                resDiff.textContent = '—';
+                return;
+            }
+
+            const kLow = Math.max(0, Math.ceil(a));
+            const kHigh = Math.min(N, Math.floor(b));
+            const bProb = binomialRangeProb(a, b, N, p);
+            const gProb = gaussianRangeProb(a, b, mu, sigma);
+            const diff = Math.abs(bProb - gProb);
+
+            resBinom.textContent = bProb.toFixed(6);
+            resBinomRange.textContent = `sum k = ${kLow} … ${kHigh}`;
+            resGauss.textContent = gProb.toFixed(6);
+            resDiff.textContent = diff.toFixed(6);
+
+            // Redraw shade traces
+            const { shadeX_binom, shadeY_binom, shadeX_gauss, shadeY_gauss } =
+                buildShadeTraces(mu, sigma, N, p, gaussX);
+            Plotly.restyle(chartContainer, {
+                x: [shadeX_binom, shadeX_gauss],
+                y: [shadeY_binom, shadeY_gauss]
+            }, [2, 3]);
+        }
+
+        // State shared with the integral input listeners
+        let _state = { mu: 25, sigma: 3.54, N: 50, p: 0.5, gaussX: [] };
+
+        function onIntegralChange() {
+            const { mu, sigma, N, p, gaussX } = _state;
+            updateIntegral(mu, sigma, N, p, gaussX);
+        }
+
+        // Attach listeners for real-time updates while dragging
+        sliderN.addEventListener('input', update);
+        sliderP.addEventListener('input', update);
+        inputA.addEventListener('input', onIntegralChange);
+        inputB.addEventListener('input', onIntegralChange);
+
+        // Initial render
+        update();
+    </script>
+
+</body>
+
+</html>
